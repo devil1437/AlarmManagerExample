@@ -19,6 +19,7 @@ public class AlarmManagerActivity extends Activity {
 	
     private CheckBox[] mChHardware;
 
+    private final long mStartInterval = 2 * 1000; // ms
 	private final long mRepeatInterval = 15*1000; // ms
 	private AlarmManagerBroadcastReceiver mAlarm;
 	
@@ -58,7 +59,8 @@ public class AlarmManagerActivity extends Activity {
     public void startRepeatingTimer(View view) {
     	Context context = this.getApplicationContext();
     	if(mAlarm != null){
-            mAlarm.setRepeatAlarm(context, mRepeatInterval, getCheckedHardware());
+            mAlarm.setRepeatAlarm(context, System.currentTimeMillis(), mRepeatInterval,
+                    getCheckedHardware());
     	}else{
     		Toast.makeText(context, "Alarm is null", Toast.LENGTH_SHORT).show();
     	}
@@ -76,7 +78,8 @@ public class AlarmManagerActivity extends Activity {
     public void onetimeTimer(View view){
     	Context context = this.getApplicationContext();
     	if(mAlarm != null){
-            mAlarm.setOnetimeAlarm(context, getCheckedHardware());
+            mAlarm.setOnetimeAlarm(context, System.currentTimeMillis() + mStartInterval,
+                    getCheckedHardware());
     	}else{
     		Toast.makeText(context, "Alarm is null", Toast.LENGTH_SHORT).show();
     	}

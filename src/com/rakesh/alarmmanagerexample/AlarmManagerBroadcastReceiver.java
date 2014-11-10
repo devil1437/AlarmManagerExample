@@ -19,7 +19,6 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
-import android.os.SystemClock;
 import android.os.Vibrator;
 import android.util.Log;
 import android.widget.Toast;
@@ -35,6 +34,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 
 	public final static String ONE_TIME = "onetime";
 	public final static String INTERVAL = "interval";
+    public final static String SCHEDULE_TIME = "scheduleTime";
     public final static String CHECK_HARDWARE = "checkedHardware";
 	private final static String TAG = "AlarmManagerBroadcastReceiver";
 	private final static String WAKELOCK_TAG = "alarmmanagerexample";
@@ -48,8 +48,8 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 
     private Context mApplicationContext;
     
-    private final long mStartInterval = 2 * 1000; // ms
     private final long mDefaultRepeatInterval = 15 * 1000; // ms
+    private final long mAlignment = 10 * 1000; // ms
 
     private SensorManager mSensorManager;
     private Sensor mAccelerometer;
@@ -188,7 +188,8 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
             } else {
                 msgStr.append("Repeat Timer: ");
                 long interval = extras.getLong(INTERVAL, mDefaultRepeatInterval);
-                setRepeatAlarm(context, interval, checkedHardware);
+                long scheduleTime = extras.getLong(SCHEDULE_TIME, System.currentTimeMillis());
+                setRepeatAlarm(context, scheduleTime, interval, checkedHardware);
             }
         }
 		
@@ -234,7 +235,11 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 
 	}
 
-	public void setRepeatAlarm(Context context, long repeatInterval,
+    private long getNextWakeUpTime(long elapsedTime) {
+        return elapsedTime - elapsedTime % mAlignment;
+    }
+
+    public void setRepeatAlarm(Context context, long prevScheduleTime, long repeatInterval,
             ArrayList<Hardware> checkedHardware) {
 		if(DEBUG){
 			Log.d(TAG, "setRepeatAlarm().");
@@ -245,8 +250,11 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
         intent.putExtra(CHECK_HARDWARE, checkedHardware);
 		intent.putExtra(ONE_TIME, Boolean.FALSE);
 		intent.putExtra(INTERVAL, repeatInterval);
+        intent.putExtra(SCHEDULE_TIME, prevScheduleTime + repeatInterval);
+
 		PendingIntent pi = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-		am.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + mStartInterval, pi);
+        am.setExact(AlarmManager.RTC_WAKEUP,
+                getNextWakeUpTime(prevScheduleTime + repeatInterval), pi);
 	}
 
 	public void cancelRepeatAlarm(Context context) {
@@ -261,7 +269,8 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 		alarmManager.cancel(sender);
 	}
 
-    public void setOnetimeAlarm(Context context, ArrayList<Hardware> checkedHardware) {
+    public void setOnetimeAlarm(Context context, long scheduleTime,
+            ArrayList<Hardware> checkedHardware) {
 		if(DEBUG){
 			Log.d(TAG, "setOnetimeAlarm().");
 		}
@@ -272,8 +281,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
         intent.putExtra(ONE_TIME, Boolean.TRUE);
         PendingIntent pi = PendingIntent.getBroadcast(context, 0, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT);
-        am.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime()
-                + mStartInterval, pi);
+        am.setExact(AlarmManager.RTC_WAKEUP, scheduleTime, pi);
 	}
 
     @Override
