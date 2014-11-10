@@ -11,6 +11,9 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -35,29 +38,37 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
     public final static String CHECK_HARDWARE = "checkedHardware";
 	private final static String TAG = "AlarmManagerBroadcastReceiver";
 	private final static String WAKELOCK_TAG = "alarmmanagerexample";
+
 	private final static boolean DEBUG = true;
-    private final static String NETWORK_HOST = "1.161.49.106"; // My desktop
+    private final static String NETWORK_HOST = "1.161.53.168"; // My desktop
     private final static String NETWORK_COMMAND = "ping -c 1 " + NETWORK_HOST;
     private final static long[] DEFAULT_VIBRATE_PATTERN = {
             0, 250, 250, 250
     };
 
+    private Context mApplicationContext;
+    
     private final long mStartInterval = 2 * 1000; // ms
     private final long mDefaultRepeatInterval = 15 * 1000; // ms
-    private Context mActivityContext;
 
     private SensorManager mSensorManager;
     private Sensor mAccelerometer;
     private final long mSensorTimeout = 5 * 1000; // ms
     private long mSensorStartRTC = -1;
-	
+    
+    private boolean mWait = false;
+
     public AlarmManagerBroadcastReceiver() {
     }
-
-    public AlarmManagerBroadcastReceiver(Context activityContext) {
-        mActivityContext = activityContext;
+    
+    public AlarmManagerBroadcastReceiver(Context context) {
+    	mApplicationContext = context;
     }
 
+    /**
+     * Send a ping packet to specified host.
+     * @return
+     */
     private int sendPing() {
         Runtime runtime = Runtime.getRuntime();
         Process proc;
@@ -95,12 +106,72 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 
         return -1;
     }
+    
+    /**
+     * Notification default vibration.
+     * @param context
+     */
+    private void vibrate(Context context) {
+    	Vibrator v = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+        v.vibrate(DEFAULT_VIBRATE_PATTERN, -1);
+	}
+    
+    /**
+     * Notification default sound.
+     * @param context
+     */
+    private void playSound(Context context) {
+        Uri notification = RingtoneManager
+                .getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        Ringtone r = RingtoneManager.getRingtone(context.getApplicationContext(),
+                notification);
+        r.play();
+	}
+    
+    /**
+     * Turn on the screen.
+     * @param context
+     */
+	private void screenOn(Context context) {
+		PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+		PowerManager.WakeLock fullWl = powerManager.newWakeLock(
+                PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP
+                        | PowerManager.ON_AFTER_RELEASE, WAKELOCK_TAG);
+        fullWl.acquire();
+        fullWl.release();
+	}
+	
+	/**
+	 * Register the listener of accelerometer.
+	 * You can set mSensorTimeout to 
+	 * @param context
+	 */
+	private void registerAcc(Context context) {
+		mSensorStartRTC = -1;
+		mSensorManager = (SensorManager) context
+                .getSystemService(Context.SENSOR_SERVICE);
+        mAccelerometer = mSensorManager
+                .getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        mSensorManager.registerListener(this, mAccelerometer,
+                SensorManager.SENSOR_DELAY_NORMAL);
+	}
+	
+	/**
+	 * Request one time agps/gps.
+	 * @param networkProvider
+	 * @param context
+	 */
+	private void requestSingleGPS(Context context, String networkProvider) {
+		LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+        MyLocationListener myLL = new MyLocationListener();
+        locationManager.requestSingleUpdate(networkProvider, myLL, null);
+
+	}
 
 	@Override
 	public void onReceive(Context context, Intent intent) {
-		PowerManager pm = (PowerManager) context
-				.getSystemService(Context.POWER_SERVICE);
-		PowerManager.WakeLock wl = pm.newWakeLock(
+		PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+		PowerManager.WakeLock wl = powerManager.newWakeLock(
 				PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG);
 		// Acquire the lock
 		wl.acquire();
@@ -130,72 +201,40 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 		}
 
         for(Hardware h : checkedHardware){
+        	if (DEBUG) {
+                Log.d(TAG, h.name());
+            }
             switch(h){
                 case NETWORK:
-                    if (DEBUG) {
-                        Log.d(TAG, "NETWORK. Send a ping packet.");
-                    }
                     sendPing();
                     break;
                 case VIBRATION:
-                    if (DEBUG) {
-                        Log.d(TAG, "VIBRATION. Default vibration.");
-                    }
-                    Vibrator vibrator = (Vibrator) context
-                            .getSystemService(Context.VIBRATOR_SERVICE);
-                    vibrator.vibrate(DEFAULT_VIBRATE_PATTERN, -1);
+                	vibrate(context);
                     break;
                 case SOUND:
-                    if (DEBUG) {
-                        Log.d(TAG, "NETWORK. Default sound.");
-                    }
-                    Uri notification = RingtoneManager
-                            .getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-                    Ringtone r = RingtoneManager.getRingtone(context.getApplicationContext(),
-                            notification);
-                    r.play();
+                	playSound(context);
                     break;
                 case SCREEN:
-                    if (DEBUG) {
-                        Log.d(TAG, "NETWORK. Screen on.");
-                    }
-                    PowerManager.WakeLock fullWl = pm.newWakeLock(
-                            PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP
-                                    | PowerManager.ON_AFTER_RELEASE, WAKELOCK_TAG);
-                    fullWl.acquire();
-                    fullWl.release();
+                	screenOn(context);
                     break;
                 case SENSOR_ACC:
-                    if (DEBUG) {
-                        Log.d(TAG, "NETWORK. Accelerometer 5 sec.");
-                    }
-                    mSensorStartRTC = -1;
-                    mSensorManager = (SensorManager) context
-                            .getSystemService(Context.SENSOR_SERVICE);
-                    mAccelerometer = mSensorManager
-                            .getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-                    mSensorManager.registerListener(this, mAccelerometer,
-                            SensorManager.SENSOR_DELAY_NORMAL);
+                	registerAcc(context);
                     break;
                 case AGPS:
-                    if (DEBUG) {
-                        Log.d(TAG, "NETWORK. Request one time AGPS.");
-                    }
+                	requestSingleGPS(context, LocationManager.NETWORK_PROVIDER);
                     break;
                 case GPS:
-                    if (DEBUG) {
-                        Log.d(TAG, "NETWORK. Request one time GPS.");
-                    }
+                	requestSingleGPS(context, LocationManager.GPS_PROVIDER);
                     break;
             }
         }
-                
+
 		// Release the lock
 		wl.release();
 
 	}
 
-    public void setRepeatAlarm(Context context, long repeatInterval,
+	public void setRepeatAlarm(Context context, long repeatInterval,
             ArrayList<Hardware> checkedHardware) {
 		if(DEBUG){
 			Log.d(TAG, "setRepeatAlarm().");
@@ -226,14 +265,15 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 		if(DEBUG){
 			Log.d(TAG, "setOnetimeAlarm().");
 		}
-		AlarmManager am = (AlarmManager) context
-				.getSystemService(Context.ALARM_SERVICE);
-		Intent intent = new Intent(context, AlarmManagerBroadcastReceiver.class);
+        AlarmManager am = (AlarmManager) context
+                .getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(context, AlarmManagerBroadcastReceiver.class);
         intent.putExtra(CHECK_HARDWARE, checkedHardware);
-		intent.putExtra(ONE_TIME, Boolean.TRUE);
+        intent.putExtra(ONE_TIME, Boolean.TRUE);
         PendingIntent pi = PendingIntent.getBroadcast(context, 0, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT);
-		am.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + mStartInterval, pi);
+        am.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime()
+                + mStartInterval, pi);
 	}
 
     @Override
@@ -256,6 +296,37 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
             } else if (System.currentTimeMillis() - mSensorStartRTC > mSensorTimeout) {
                 mSensorManager.unregisterListener(this);
             }
+        }
+    }
+
+    private class MyLocationListener implements LocationListener {
+
+        private final static String TAG = "AlarmManagerBroadcastReceiver";
+
+        @Override
+        public void onLocationChanged(Location location) {
+            if (DEBUG) {
+                Log.d(TAG, "onLocationChanged(). Location: " + location.toString());
+            }
+            mWait = false;
+        }
+
+        @Override
+        public void onProviderDisabled(String provider) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void onProviderEnabled(String provider) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void onStatusChanged(String provider, int status, Bundle extras) {
+            // TODO Auto-generated method stub
+
         }
     }
 }

@@ -35,7 +35,7 @@ public class AlarmManagerActivity extends Activity {
             mainLayout.addView(mChHardware[i]);
         }
 
-        mAlarm = new AlarmManagerBroadcastReceiver(this);
+        mAlarm = new AlarmManagerBroadcastReceiver(this.getApplicationContext());
     }
     
     @Override
