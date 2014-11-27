@@ -153,6 +153,12 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
                 .getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         mSensorManager.registerListener(this, mAccelerometer,
                 SensorManager.SENSOR_DELAY_NORMAL);
+
+        PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        PowerManager.WakeLock wl = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG);
+        // Acquire the lock
+        wl.acquire(mSensorTimeout);
 	}
 	
 	/**
