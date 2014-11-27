@@ -1,7 +1,5 @@
 package com.rakesh.alarmmanagerexample;
 
-import com.rakesh.alarmmanagerexample2.R;
-
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
@@ -15,7 +13,7 @@ import java.util.ArrayList;
 
 public class AlarmManagerActivity extends Activity {
 
-    public static enum Hardware {
+    public static enum HARDWARE {
         NETWORK, VIBRATION, SOUND, SCREEN, SENSOR_ACC, AGPS, GPS
     };
 	
@@ -31,10 +29,10 @@ public class AlarmManagerActivity extends Activity {
         setContentView(R.layout.activity_alarm_manager);
         LinearLayout mainLayout = (LinearLayout) findViewById(R.id.llMain);
 
-        mChHardware = new CheckBox[Hardware.values().length];
-        for (int i = 0; i < Hardware.values().length; i++) {
+        mChHardware = new CheckBox[HARDWARE.values().length];
+        for (int i = 0; i < HARDWARE.values().length; i++) {
             mChHardware[i] = new CheckBox(this);
-            mChHardware[i].setText(Hardware.values()[i].name());
+            mChHardware[i].setText(HARDWARE.values()[i].name());
             mainLayout.addView(mChHardware[i]);
         }
 
@@ -46,12 +44,12 @@ public class AlarmManagerActivity extends Activity {
 		super.onStart();
 	}
 
-    private ArrayList<Hardware> getCheckedHardware() {
-        ArrayList<Hardware> ret = new ArrayList<Hardware>();
+    private ArrayList<HARDWARE> getCheckedHardware() {
+        ArrayList<HARDWARE> ret = new ArrayList<HARDWARE>();
 
         for (int i = 0; i < mChHardware.length; i++) {
             if (mChHardware[i].isChecked()) {
-                ret.add(Hardware.values()[i]);
+                ret.add(HARDWARE.values()[i]);
             }
         }
 

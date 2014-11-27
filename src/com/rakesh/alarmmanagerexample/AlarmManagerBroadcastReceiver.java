@@ -1,6 +1,6 @@
 package com.rakesh.alarmmanagerexample;
 
-import com.rakesh.alarmmanagerexample.AlarmManagerActivity.Hardware;
+import com.rakesh.alarmmanagerexample.AlarmManagerActivity.HARDWARE;
 
 import android.app.AlarmManager;
 import android.app.PendingIntent;
@@ -40,7 +40,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 	private final static String WAKELOCK_TAG = "alarmmanagerexample";
 
 	private final static boolean DEBUG = true;
-    private final static String NETWORK_HOST = "1.161.53.168"; // My desktop
+    private final static String NETWORK_HOST = "1.161.54.17"; // My desktop
     private final static String NETWORK_COMMAND = "ping -c 1 " + NETWORK_HOST;
     private final static long[] DEFAULT_VIBRATE_PATTERN = {
             0, 250, 250, 250
@@ -179,9 +179,9 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 		Bundle extras = intent.getExtras();
 		StringBuilder msgStr = new StringBuilder();
 
-        ArrayList<Hardware> checkedHardware = null;
+        ArrayList<HARDWARE> checkedHardware = null;
         if (extras != null) {
-            checkedHardware = (ArrayList<Hardware>) extras.getSerializable(CHECK_HARDWARE);
+            checkedHardware = (ArrayList<HARDWARE>) extras.getSerializable(CHECK_HARDWARE);
             if (extras.getBoolean(ONE_TIME, Boolean.FALSE)) {
                 msgStr.append("One time Timer: ");
             } else {
@@ -200,7 +200,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 			Log.d(TAG, msgStr.toString());
 		}
 
-        for(Hardware h : checkedHardware){
+        for(HARDWARE h : checkedHardware){
         	if (DEBUG) {
                 Log.d(TAG, h.name());
             }
@@ -239,7 +239,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
     }
 
     public void setRepeatAlarm(Context context, long prevScheduleTime, long repeatInterval,
-            ArrayList<Hardware> checkedHardware) {
+            ArrayList<HARDWARE> checkedHardware) {
 		if(DEBUG){
             Log.d(TAG, "setRepeatAlarm(). Hardware: " + checkedHardware.toString());
 		}
@@ -269,7 +269,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 	}
 
     public void setOnetimeAlarm(Context context, long scheduleTime,
-            ArrayList<Hardware> checkedHardware) {
+            ArrayList<HARDWARE> checkedHardware) {
 		if(DEBUG){
             Log.d(TAG, "setOnetimeAlarm(). Hardware: " + checkedHardware.toString());
 		}
