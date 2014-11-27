@@ -20,7 +20,7 @@ public class AlarmManagerActivity extends Activity {
     private CheckBox[] mChHardware;
 
     private final long mStartInterval = 2 * 1000; // ms
-    private final long mRepeatInterval = 65 * 1000; // ms
+    private final long mRepeatInterval = 35 * 1000; // ms
 	private AlarmManagerBroadcastReceiver mAlarm;
 	
     @Override

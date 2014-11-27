@@ -48,7 +48,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 
     private Context mApplicationContext;
 
-    private final long mAlignment = 60 * 1000; // ms
+    private final long mAlignment = 30 * 1000; // ms
 
     private SensorManager mSensorManager;
     private Sensor mAccelerometer;
