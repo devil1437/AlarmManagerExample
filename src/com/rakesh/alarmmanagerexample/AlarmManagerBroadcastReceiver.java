@@ -19,6 +19,7 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
+import android.os.PowerManager.WakeLock;
 import android.os.Vibrator;
 import android.util.Log;
 import android.widget.Toast;
@@ -47,6 +48,8 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
     };
 
     private Context mApplicationContext;
+    private Context mAlarmContext;
+    private WakeLock mWakelock;
 
     private final long mAlignment = 30 * 1000; // ms
 
@@ -56,6 +59,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
     private long mSensorStartRTC = -1;
     
     private boolean mWait = false;
+    private final long mGpsTimeout = 2 * 60 * 1000; // ms
 
     public AlarmManagerBroadcastReceiver() {
     }
@@ -155,10 +159,10 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
                 SensorManager.SENSOR_DELAY_NORMAL);
 
         PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-        PowerManager.WakeLock wl = powerManager.newWakeLock(
+        PowerManager.WakeLock mWakelock = powerManager.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG);
         // Acquire the lock
-        wl.acquire(mSensorTimeout);
+        mWakelock.acquire(mSensorTimeout);
 	}
 	
 	/**
@@ -167,14 +171,21 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 	 * @param context
 	 */
 	private void requestSingleGPS(Context context, String networkProvider) {
-		LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-        MyLocationListener myLL = new MyLocationListener();
-        locationManager.requestSingleUpdate(networkProvider, myLL, null);
+        PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        PowerManager.WakeLock mWakelock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG);
+        // Acquire the lock
+        mWakelock.acquire(mGpsTimeout);
 
+        LocationManager locationManager = (LocationManager) context
+                .getSystemService(Context.LOCATION_SERVICE);
+        MyLocationListener myLL = new MyLocationListener(context, mWakelock);
+        locationManager.requestSingleUpdate(networkProvider, myLL, null);
 	}
 
 	@Override
 	public void onReceive(Context context, Intent intent) {
+        mAlarmContext = context;
 		PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
 		PowerManager.WakeLock wl = powerManager.newWakeLock(
 				PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG);
@@ -308,17 +319,28 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
                 mSensorStartRTC = System.currentTimeMillis();
             } else if (System.currentTimeMillis() - mSensorStartRTC > mSensorTimeout) {
                 mSensorManager.unregisterListener(this);
+                mWakelock.release();
             }
         }
     }
 
     private class MyLocationListener implements LocationListener {
+
+        Context mAlarmContext;
+        WakeLock mWakelock;
+
+        MyLocationListener(Context context, WakeLock wakelock) {
+            mAlarmContext = context;
+            mWakelock = wakelock;
+        }
+
         @Override
         public void onLocationChanged(Location location) {
             if (DEBUG) {
                 Log.d(TAG, "onLocationChanged(). Location: " + location.toString());
             }
             mWait = false;
+            mWakelock.release();
         }
 
         @Override
