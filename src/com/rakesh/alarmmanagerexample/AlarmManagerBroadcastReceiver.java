@@ -47,9 +47,8 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
     };
 
     private Context mApplicationContext;
-    
-    private final long mDefaultRepeatInterval = 15 * 1000; // ms
-    private final long mAlignment = 10 * 1000; // ms
+
+    private final long mAlignment = 60 * 1000; // ms
 
     private SensorManager mSensorManager;
     private Sensor mAccelerometer;
@@ -187,8 +186,8 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
                 msgStr.append("One time Timer: ");
             } else {
                 msgStr.append("Repeat Timer: ");
-                long interval = extras.getLong(INTERVAL, mDefaultRepeatInterval);
-                long scheduleTime = extras.getLong(SCHEDULE_TIME, System.currentTimeMillis());
+                long interval = extras.getLong(INTERVAL, -1);
+                long scheduleTime = extras.getLong(SCHEDULE_TIME, -1);
                 setRepeatAlarm(context, scheduleTime, interval, checkedHardware);
             }
         }
@@ -242,7 +241,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
     public void setRepeatAlarm(Context context, long prevScheduleTime, long repeatInterval,
             ArrayList<Hardware> checkedHardware) {
 		if(DEBUG){
-			Log.d(TAG, "setRepeatAlarm().");
+            Log.d(TAG, "setRepeatAlarm(). Hardware: " + checkedHardware.toString());
 		}
 		AlarmManager am = (AlarmManager) context
 				.getSystemService(Context.ALARM_SERVICE);
@@ -254,7 +253,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 
 		PendingIntent pi = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
         am.setExact(AlarmManager.RTC_WAKEUP,
-                getNextWakeUpTime(prevScheduleTime + repeatInterval), pi);
+                getNextWakeUpTime(System.currentTimeMillis() + repeatInterval), pi);
 	}
 
 	public void cancelRepeatAlarm(Context context) {
@@ -272,7 +271,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
     public void setOnetimeAlarm(Context context, long scheduleTime,
             ArrayList<Hardware> checkedHardware) {
 		if(DEBUG){
-			Log.d(TAG, "setOnetimeAlarm().");
+            Log.d(TAG, "setOnetimeAlarm(). Hardware: " + checkedHardware.toString());
 		}
         AlarmManager am = (AlarmManager) context
                 .getSystemService(Context.ALARM_SERVICE);
@@ -308,9 +307,6 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
     }
 
     private class MyLocationListener implements LocationListener {
-
-        private final static String TAG = "AlarmManagerBroadcastReceiver";
-
         @Override
         public void onLocationChanged(Location location) {
             if (DEBUG) {

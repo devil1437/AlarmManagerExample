@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.rakesh.alarmmanagerexample"
+    package="com.rakesh.alarmmanagerexample2"
     android:versionCode="1"
     android:versionName="1.0" >
 
@@ -28,7 +28,7 @@
             </intent-filter>
         </activity>
         <!-- Broadcast receiver -->
-        <receiver   android:name=".AlarmManagerBroadcastReceiver"></receiver>
+        <receiver   android:name="com.rakesh.alarmmanagerexample.AlarmManagerBroadcastReceiver"></receiver>
     </application>
   
 </manifest>
