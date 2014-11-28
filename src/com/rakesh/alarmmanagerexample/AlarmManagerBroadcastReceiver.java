@@ -319,7 +319,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
                 mSensorStartRTC = System.currentTimeMillis();
             } else if (System.currentTimeMillis() - mSensorStartRTC > mSensorTimeout) {
                 mSensorManager.unregisterListener(this);
-                if (mWakelock.isHeld()) {
+                while (mWakelock.isHeld()) {
                     mWakelock.release();
                 }
             }
@@ -342,7 +342,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
                 Log.d(TAG, "onLocationChanged(). Location: " + location.toString());
             }
             mWait = false;
-            if (mWakelock.isHeld()) {
+            while (mWakelock.isHeld()) {
                 mWakelock.release();
             }
         }
