@@ -159,8 +159,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
                 SensorManager.SENSOR_DELAY_NORMAL);
 
         PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-        PowerManager.WakeLock mWakelock = powerManager.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG);
+        mWakelock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG);
         // Acquire the lock
         mWakelock.acquire(mSensorTimeout);
 	}
@@ -319,7 +318,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
                 mSensorStartRTC = System.currentTimeMillis();
             } else if (System.currentTimeMillis() - mSensorStartRTC > mSensorTimeout) {
                 mSensorManager.unregisterListener(this);
-                while (mWakelock.isHeld()) {
+                while (mWakelock != null && mWakelock.isHeld()) {
                     mWakelock.release();
                 }
             }
@@ -342,7 +341,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
                 Log.d(TAG, "onLocationChanged(). Location: " + location.toString());
             }
             mWait = false;
-            while (mWakelock.isHeld()) {
+            while (mWakelock != null && mWakelock.isHeld()) {
                 mWakelock.release();
             }
         }
