@@ -13,14 +13,7 @@
         android:text="@string/btStart"
         android:onClick="startRepeatingTimer"
         tools:context=".WidgetAlarmManagerActivity" />
-    <Button
-        android:id="@+id/btCancel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="@dimen/padding_medium"
-        android:text="@string/btCancel"
-        android:onClick="cancelRepeatingTimer"
-        tools:context=".WidgetAlarmManagerActivity" />
+    
 	<Button
         android:id="@+id/btOneTime"
         android:layout_width="match_parent"
@@ -36,7 +29,69 @@
 	    android:layout_height="wrap_content"
 	    android:onClick="testCase"
 	    android:padding="@dimen/padding_medium"
-	    android:text="Test Case"
+	    android:text="@string/btTestCase"
 	    tools:context=".WidgetAlarmManagerActivity" />
-
+	
+	<Button
+	    android:id="@+id/btTestCase2"
+	    android:layout_width="match_parent"
+	    android:layout_height="wrap_content"
+	    android:onClick="testCase2"
+	    android:padding="@dimen/padding_medium"
+	    android:text="@string/btTestCase2"
+	    tools:context=".WidgetAlarmManagerActivity" />
+	
+	<Button
+        android:id="@+id/btCancel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/padding_medium"
+        android:text="@string/btCancel"
+        android:onClick="resetAllTimer"
+        tools:context=".WidgetAlarmManagerActivity" />
+	
+	<LinearLayout
+	    android:id="@+id/llSeekBar"
+    	android:layout_width="match_parent"
+    	android:layout_height="wrap_content" 
+    	android:orientation="horizontal" >
+    	
+		<SeekBar
+		    android:id="@+id/sbInterval"
+	      	android:layout_width="0dip"
+	      	android:layout_height="wrap_content"
+	      	android:layout_weight="0.8" />
+		
+		<TextView
+	    	android:id="@+id/tvIntervalValue"
+	    	android:layout_width="0dip"
+	    	android:layout_height="fill_parent"
+	    	android:layout_weight="0.2" 
+	    	android:gravity="center"
+	    	android:text="@string/tvDefault" />
+		
+	</LinearLayout>
+	
+	<GridLayout 
+	    android:id="@+id/glHardware"
+    	android:layout_width="match_parent"
+    	android:layout_height="wrap_content" 
+    	android:orientation="horizontal"
+    	android:rowCount="3"
+    	android:columnCount="3" />
+	
+	<ScrollView 
+    	android:id="@+id/svAlarms"
+    	android:layout_width="match_parent"
+    	android:layout_height="fill_parent" >
+	
+		<GridLayout 
+		    android:id="@+id/glAlarms"
+	    	android:layout_width="match_parent"
+	    	android:layout_height="wrap_content" 
+	    	android:orientation="horizontal"
+	    	android:columnCount="1" />
+		
+	</ScrollView>
+	
 </LinearLayout>

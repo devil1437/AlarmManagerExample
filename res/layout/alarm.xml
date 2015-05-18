@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<GridLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="#FFFFFF"
+    android:rowCount="3"
+    android:columnCount="3" >
+    
+	<TextView
+		android:id="@+id/tvId"
+	    android:gravity="center"
+	    android:text="@string/tvDefault" />
+	
+	<TextView
+		android:id="@+id/tvInterval"
+	    android:gravity="center"
+	    android:text="@string/tvDefault" />
+	
+	<Button
+	    android:id="@+id/btCancel"
+	    android:padding="@dimen/padding_medium"
+	    android:gravity="center"
+	    android:text="@string/btCancelAlarm" />
+	
+	<TextView
+		android:id="@+id/tvHardware"
+	    android:gravity="center"
+	    android:text="@string/tvDefault" />
+    
+</GridLayout>

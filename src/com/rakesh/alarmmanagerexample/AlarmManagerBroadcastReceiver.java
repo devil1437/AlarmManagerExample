@@ -1,6 +1,8 @@
 package com.rakesh.alarmmanagerexample;
 
-import com.rakesh.alarmmanagerexample.AlarmManagerActivity.Hardware;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
+import com.google.android.gms.common.api.GoogleApiClient.OnConnectionFailedListener;
 
 import android.app.AlarmManager;
 import android.app.PendingIntent;
@@ -18,6 +20,8 @@ import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.os.Vibrator;
 import android.util.Log;
@@ -30,38 +34,72 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 
-public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements SensorEventListener {
+public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements
+        SensorEventListener, ConnectionCallbacks,
+        OnConnectionFailedListener {
 
 	public final static String ONE_TIME = "onetime";
 	public final static String INTERVAL = "interval";
     public final static String SCHEDULE_TIME = "scheduleTime";
     public final static String CHECK_HARDWARE = "checkedHardware";
+    public final static String IS_EXACT = "isExact";
 	private final static String TAG = "AlarmManagerBroadcastReceiver";
 	private final static String WAKELOCK_TAG = "alarmmanagerexample";
 
 	private final static boolean DEBUG = true;
-    private final static String NETWORK_HOST = "1.161.53.168"; // My desktop
+    private final static String NETWORK_HOST = "140.112.28.143"; // Newslab
+                                                                 // server
     private final static String NETWORK_COMMAND = "ping -c 1 " + NETWORK_HOST;
     private final static long[] DEFAULT_VIBRATE_PATTERN = {
             0, 250, 250, 250
     };
+    protected static final int RELEASE_WAKELOCK = 10001;
 
     private Context mApplicationContext;
+    private AlarmManagerActivity mActivityContext;
+    private final int mId;
 
+    private boolean mIsRepeat;
+    private final long mWakelockTimeout = 15 * 1000; // ms
     private final long mAlignment = 60 * 1000; // ms
+    private PendingIntent mPendingIntent;
 
     private SensorManager mSensorManager;
     private Sensor mAccelerometer;
     private final long mSensorTimeout = 5 * 1000; // ms
     private long mSensorStartRTC = -1;
+
+    LocationManager mLocationManager;
+    MyLocationListener mMyLocationListener = new MyLocationListener();
+    private final long mGPSTimeout = 5 * 1000; // ms
+
+    PowerManager.WakeLock mWakelock;
+    private AlarmView mView;
     
-    private boolean mWait = false;
+    private Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(android.os.Message msg) {
+            switch (msg.what) {
+                case RELEASE_WAKELOCK:
+                    if (mWakelock != null && mWakelock.isHeld()) {
+                        if (DEBUG) {
+                            Log.d(TAG, "release wakelock.");
+                        }
+                        mWakelock.release();
+                    }
+            }
+        };
+    };
 
     public AlarmManagerBroadcastReceiver() {
+        mId = -1;
     }
-    
-    public AlarmManagerBroadcastReceiver(Context context) {
+
+    public AlarmManagerBroadcastReceiver(Context context, AlarmManagerActivity activityContext,
+            int id) {
     	mApplicationContext = context;
+    	mActivityContext = activityContext;
+        mId = id;
     }
 
     /**
@@ -94,6 +132,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 
             proc.waitFor();
             int exit = proc.exitValue();
+            mHandler.sendEmptyMessageDelayed(RELEASE_WAKELOCK, 0);
             return exit;
         } catch (IOException e) {
             // TODO Auto-generated catch block
@@ -103,9 +142,11 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
             e.printStackTrace();
         }
 
+        mHandler.sendEmptyMessageDelayed(RELEASE_WAKELOCK, 0);
+
         return -1;
     }
-    
+
     /**
      * Notification default vibration.
      * @param context
@@ -113,6 +154,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
     private void vibrate(Context context) {
     	Vibrator v = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
         v.vibrate(DEFAULT_VIBRATE_PATTERN, -1);
+        mHandler.sendEmptyMessageDelayed(RELEASE_WAKELOCK, 0);
 	}
     
     /**
@@ -125,6 +167,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
         Ringtone r = RingtoneManager.getRingtone(context.getApplicationContext(),
                 notification);
         r.play();
+        mHandler.sendEmptyMessageDelayed(RELEASE_WAKELOCK, 0);
 	}
     
     /**
@@ -138,6 +181,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
                         | PowerManager.ON_AFTER_RELEASE, WAKELOCK_TAG);
         fullWl.acquire();
         fullWl.release();
+        mHandler.sendEmptyMessageDelayed(RELEASE_WAKELOCK, 0);
 	}
 	
 	/**
@@ -154,26 +198,42 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
         mSensorManager.registerListener(this, mAccelerometer,
                 SensorManager.SENSOR_DELAY_NORMAL);
 	}
-	
+
 	/**
 	 * Request one time agps/gps.
 	 * @param networkProvider
 	 * @param context
 	 */
 	private void requestSingleGPS(Context context, String networkProvider) {
-		LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-        MyLocationListener myLL = new MyLocationListener();
-        locationManager.requestSingleUpdate(networkProvider, myLL, null);
+        mLocationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+        mMyLocationListener = new MyLocationListener();
+        Looper myLooper = Looper.myLooper();
+        // mLocationManager.requestLocationUpdates(networkProvider, 5 * 1000, 5
+        // * 1000,
+        // mMyLocationListener,
+        // myLooper);
+        mLocationManager.requestSingleUpdate(networkProvider,
+                mMyLocationListener, myLooper);
+        final Handler myHandler = new Handler(myLooper);
 
+        myHandler.postDelayed(new Runnable() {
+            public void run() {
+                mLocationManager.removeUpdates(mMyLocationListener);
+                mHandler.sendEmptyMessageDelayed(RELEASE_WAKELOCK, 0);
+            }
+        }, mGPSTimeout);
 	}
 
-	@Override
+    @Override
 	public void onReceive(Context context, Intent intent) {
 		PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-		PowerManager.WakeLock wl = powerManager.newWakeLock(
+        mWakelock = powerManager.newWakeLock(
 				PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG);
 		// Acquire the lock
-		wl.acquire();
+        mWakelock.acquire(mWakelockTimeout);
+        if (DEBUG && mWakelock.isHeld()) {
+            Log.d(TAG, "acquire wakelock.");
+        }
 
 		// You can do the processing here update the widget/remote views.
 		Bundle extras = intent.getExtras();
@@ -183,12 +243,37 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
         if (extras != null) {
             checkedHardware = (ArrayList<Hardware>) extras.getSerializable(CHECK_HARDWARE);
             if (extras.getBoolean(ONE_TIME, Boolean.FALSE)) {
-                msgStr.append("One time Timer: ");
+                msgStr.append("Id: ");
+                msgStr.append(intent.getAction());
+                msgStr.append(".One time Timer: ");
             } else {
-                msgStr.append("Repeat Timer: ");
+                Context applicationContext = context.getApplicationContext();
+                int id = Integer.parseInt(intent.getAction());
                 long interval = extras.getLong(INTERVAL, -1);
                 long scheduleTime = extras.getLong(SCHEDULE_TIME, -1);
-                setRepeatAlarm(context, scheduleTime, interval, checkedHardware);
+                boolean isExact = extras.getBoolean(IS_EXACT);
+
+                msgStr.append("Id: ");
+                msgStr.append(id);
+                msgStr.append(".Repeat Timer: ");
+
+                if (isExact) {
+                    long nextScheduleTime = scheduleTime + interval;
+                    long nowRTC = System.currentTimeMillis();
+                    if (DEBUG) {
+                        Log.d(TAG, "nextScheduleTime: " + nextScheduleTime + ", nowRTC: " + nowRTC);
+                    }
+                    if (nextScheduleTime < nowRTC) {
+                        nextScheduleTime += (((nowRTC - nextScheduleTime) / interval) + 1)
+                                * interval;
+                    }
+                    intent.putExtra(SCHEDULE_TIME, nextScheduleTime);
+                    AlarmManager am = (AlarmManager) applicationContext
+                            .getSystemService(Context.ALARM_SERVICE);
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast(applicationContext,
+                            id, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+                    am.setExact(AlarmManager.RTC_WAKEUP, nextScheduleTime, pendingIntent);
+                }
             }
         }
 		
@@ -199,6 +284,10 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
 		if(DEBUG){
 			Log.d(TAG, msgStr.toString());
 		}
+
+        if (checkedHardware.size() == 0) {
+            mHandler.sendEmptyMessageDelayed(RELEASE_WAKELOCK, 0);
+        }
 
         for(Hardware h : checkedHardware){
         	if (DEBUG) {
@@ -228,59 +317,74 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
                     break;
             }
         }
-
-		// Release the lock
-		wl.release();
-
 	}
 
     private long getNextWakeUpTime(long elapsedTime) {
-        return elapsedTime - elapsedTime % mAlignment;
+        return elapsedTime;
+        // return elapsedTime - elapsedTime % mAlignment;
     }
 
-    public void setRepeatAlarm(Context context, long prevScheduleTime, long repeatInterval,
-            ArrayList<Hardware> checkedHardware) {
+    public void setRepeatAlarm(long scheduleTime, long repeatInterval,
+            ArrayList<Hardware> checkedHardware, boolean isExact) {
 		if(DEBUG){
             Log.d(TAG, "setRepeatAlarm(). Hardware: " + checkedHardware.toString());
 		}
-		AlarmManager am = (AlarmManager) context
+        AlarmManager am = (AlarmManager) mApplicationContext
 				.getSystemService(Context.ALARM_SERVICE);
-		Intent intent = new Intent(context, AlarmManagerBroadcastReceiver.class);
+        Intent intent = new Intent(mApplicationContext, AlarmManagerBroadcastReceiver.class);
+        intent.setAction(Integer.toString(mId));
         intent.putExtra(CHECK_HARDWARE, checkedHardware);
 		intent.putExtra(ONE_TIME, Boolean.FALSE);
 		intent.putExtra(INTERVAL, repeatInterval);
-        intent.putExtra(SCHEDULE_TIME, prevScheduleTime + repeatInterval);
+        intent.putExtra(SCHEDULE_TIME, scheduleTime);
+        intent.putExtra(IS_EXACT, isExact);
+        mPendingIntent = PendingIntent.getBroadcast(mApplicationContext, mId, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT);
+        if (isExact) {
+            // Google doesn't provide API to set exact repeating events,
+            // so we set exact one-time event repeatedly.
+            am.setExact(AlarmManager.RTC_WAKEUP, scheduleTime, mPendingIntent);
+        } else {
+            am.setRepeating(AlarmManager.RTC_WAKEUP, scheduleTime, repeatInterval, mPendingIntent);
+        }
 
-		PendingIntent pi = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-        am.setExact(AlarmManager.RTC_WAKEUP,
-                getNextWakeUpTime(System.currentTimeMillis() + repeatInterval), pi);
+        mView = new AlarmView(mActivityContext, this);
+        mView.setAttribute(mId, repeatInterval, checkedHardware);
+        
+        mIsRepeat = true;
 	}
 
-	public void cancelRepeatAlarm(Context context) {
+    public void cancelRepeatAlarm() {
 		if(DEBUG){
 			Log.d(TAG, "cancelRepeatAlarm().");
 		}
-		Intent intent = new Intent(context, AlarmManagerBroadcastReceiver.class);
-		PendingIntent sender = PendingIntent
-				.getBroadcast(context, 0, intent, 0);
-		AlarmManager alarmManager = (AlarmManager) context
+        AlarmManager alarmManager = (AlarmManager) mApplicationContext
 				.getSystemService(Context.ALARM_SERVICE);
-		alarmManager.cancel(sender);
+        alarmManager.cancel(mPendingIntent);
 	}
 
-    public void setOnetimeAlarm(Context context, long scheduleTime,
-            ArrayList<Hardware> checkedHardware) {
+    public void setOnetimeAlarm(long scheduleTime, ArrayList<Hardware> checkedHardware,
+            boolean isExact) {
 		if(DEBUG){
             Log.d(TAG, "setOnetimeAlarm(). Hardware: " + checkedHardware.toString());
 		}
-        AlarmManager am = (AlarmManager) context
+        AlarmManager am = (AlarmManager) mApplicationContext
                 .getSystemService(Context.ALARM_SERVICE);
-        Intent intent = new Intent(context, AlarmManagerBroadcastReceiver.class);
+        Intent intent = new Intent(mApplicationContext, AlarmManagerBroadcastReceiver.class);
+        intent.setAction(Integer.toString(mId));
         intent.putExtra(CHECK_HARDWARE, checkedHardware);
         intent.putExtra(ONE_TIME, Boolean.TRUE);
-        PendingIntent pi = PendingIntent.getBroadcast(context, 0, intent,
+        mPendingIntent = PendingIntent.getBroadcast(mApplicationContext, mId, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT);
-        am.setExact(AlarmManager.RTC_WAKEUP, scheduleTime, pi);
+        if (isExact) {
+            am.setExact(AlarmManager.RTC_WAKEUP, scheduleTime, mPendingIntent);
+        } else {
+            am.set(AlarmManager.RTC_WAKEUP, scheduleTime, mPendingIntent);
+        }
+        
+        mView = new AlarmView(mActivityContext, this);
+        mView.setAttribute(mId, -1, checkedHardware);
+        mIsRepeat = false;
 	}
 
     @Override
@@ -294,14 +398,15 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
         Sensor mySensor = event.sensor;
 
         if (mySensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            if (DEBUG) {
-                Log.d(TAG, "onSensorChanged(). x:" + event.values[0] + " y:" + event.values[1]
-                        + " z:" + event.values[2]);
-            }
             if (mSensorStartRTC == -1) {
+                if (DEBUG) {
+                    Log.d(TAG, "onSensorChanged(). x:" + event.values[0] + " y:" + event.values[1]
+                            + " z:" + event.values[2]);
+                }
                 mSensorStartRTC = System.currentTimeMillis();
             } else if (System.currentTimeMillis() - mSensorStartRTC > mSensorTimeout) {
                 mSensorManager.unregisterListener(this);
+                mHandler.sendEmptyMessageDelayed(RELEASE_WAKELOCK, 0);
             }
         }
     }
@@ -312,7 +417,8 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
             if (DEBUG) {
                 Log.d(TAG, "onLocationChanged(). Location: " + location.toString());
             }
-            mWait = false;
+            mLocationManager.removeUpdates(mMyLocationListener);
+            mHandler.sendEmptyMessageDelayed(RELEASE_WAKELOCK, 0);
         }
 
         @Override
@@ -332,5 +438,41 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements 
             // TODO Auto-generated method stub
 
         }
+    }
+
+    public int getId() {
+        return mId;
+    }
+
+    public AlarmView getView() {
+        return mView;
+    }
+    
+    public boolean isRepeat() {
+        return mIsRepeat;
+    }
+
+    public String toString() {
+        StringBuffer sb = new StringBuffer(200);
+
+        return sb.toString();
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult arg0) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void onConnected(Bundle arg0) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void onConnectionSuspended(int arg0) {
+        // TODO Auto-generated method stub
+
     }
 }
