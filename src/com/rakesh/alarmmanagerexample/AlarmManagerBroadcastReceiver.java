@@ -60,7 +60,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements
     private final int mId;
 
     private boolean mIsRepeat;
-    private final long mWakelockTimeout = 15 * 1000; // ms
+    private final long mWakelockTimeout = 5 * 1000; // ms
     private final long mAlignment = 60 * 1000; // ms
     private PendingIntent mPendingIntent;
 

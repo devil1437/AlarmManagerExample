@@ -239,13 +239,14 @@ public class AlarmManagerActivity extends Activity  {
     public void testCase2(View view) {
         // Simulate the real application's behavior.
         AddRealApplicationTrace(100, 0);
-        // AddRealApplicationTrace(200, 25);
+        AddRealApplicationTrace(200, 25);
 
         // ArrayList<Hardware> hardware = new ArrayList<Hardware>();
         // hardware.add(Hardware.AGPS);
         // startRepeatingTimer(16, 0, 10 * 1000, hardware, true);
-        // startRepeatingTimer(17, 0, 20 * 1000, hardware, true);
-        // startRepeatingTimer(18, 0, 20 * 1000, hardware, true);
+        // startRepeatingTimer(1, 0, 10 * 1000, hardware, false);
+        // startRepeatingTimer(2, 0, 10 * 1000, hardware, false);
+        // startRepeatingTimer(19, 0, 10 * 1000, hardware, false);
     }
 
     private void AddRealApplicationTrace(int startId, int timeoutId) {
@@ -368,6 +369,11 @@ public class AlarmManagerActivity extends Activity  {
         startRepeatingTimer(startId + 24, RANDOM_TIMEOUT[timeoutId + 24], 5 * 60 * 1000, hardware,
                 false);
 
+        // Performance
+        hardware = new ArrayList<Hardware>();
+        hardware.add(Hardware.SOUND);
+        startRepeatingTimer(startId + 25, RANDOM_TIMEOUT[timeoutId + 0], 30 * 60 * 1000, hardware,
+                true);
     }
 
     public void resetAllTimer(View view) {
