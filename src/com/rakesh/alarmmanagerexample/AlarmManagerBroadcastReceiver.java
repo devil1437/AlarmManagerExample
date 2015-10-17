@@ -43,6 +43,8 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements
     public final static String SCHEDULE_TIME = "scheduleTime";
     public final static String CHECK_HARDWARE = "checkedHardware";
     public final static String IS_EXACT = "isExact";
+    public final static String ACC_ACCESS_TIME = "accAccessTime";
+    public final static String ACC_RATE = "accRate";
 	private final static String TAG = "AlarmManagerBroadcastReceiver";
 	private final static String WAKELOCK_TAG = "alarmmanagerexample";
 
@@ -66,7 +68,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements
 
     private SensorManager mSensorManager;
     private Sensor mAccelerometer;
-    private final long mSensorTimeout = 5 * 1000; // ms
+    private long mSensorTimeout = 5 * 1000; // ms
     private long mSensorStartRTC = -1;
 
     LocationManager mLocationManager;
@@ -189,14 +191,14 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements
 	 * You can set mSensorTimeout to 
 	 * @param context
 	 */
-	private void registerAcc(Context context) {
+    private void registerAcc(Context context, long accessTime, int rate) {
 		mSensorStartRTC = -1;
+        mSensorTimeout = accessTime;
 		mSensorManager = (SensorManager) context
                 .getSystemService(Context.SENSOR_SERVICE);
         mAccelerometer = mSensorManager
                 .getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        mSensorManager.registerListener(this, mAccelerometer,
-                SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(this, mAccelerometer, rate);
 	}
 
 	/**
@@ -307,7 +309,7 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements
                 	screenOn(context);
                     break;
                 case SENSOR_ACC:
-                	registerAcc(context);
+                    registerAcc(context, extras.getLong(ACC_ACCESS_TIME), extras.getInt(ACC_RATE));
                     break;
                 case AGPS:
                 	requestSingleGPS(context, LocationManager.NETWORK_PROVIDER);
@@ -325,19 +327,21 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements
     }
 
     public void setRepeatAlarm(long scheduleTime, long repeatInterval,
-            ArrayList<Hardware> checkedHardware, boolean isExact) {
-		if(DEBUG){
+            ArrayList<Hardware> checkedHardware, boolean isExact, long accessTime, int accRate) {
+        if (DEBUG) {
             Log.d(TAG, "setRepeatAlarm(). Hardware: " + checkedHardware.toString());
-		}
+        }
         AlarmManager am = (AlarmManager) mApplicationContext
-				.getSystemService(Context.ALARM_SERVICE);
+                .getSystemService(Context.ALARM_SERVICE);
         Intent intent = new Intent(mApplicationContext, AlarmManagerBroadcastReceiver.class);
         intent.setAction(Integer.toString(mId));
         intent.putExtra(CHECK_HARDWARE, checkedHardware);
-		intent.putExtra(ONE_TIME, Boolean.FALSE);
-		intent.putExtra(INTERVAL, repeatInterval);
+        intent.putExtra(ONE_TIME, Boolean.FALSE);
+        intent.putExtra(INTERVAL, repeatInterval);
         intent.putExtra(SCHEDULE_TIME, scheduleTime);
         intent.putExtra(IS_EXACT, isExact);
+        intent.putExtra(ACC_ACCESS_TIME, accessTime);
+        intent.putExtra(ACC_RATE, accRate);
         mPendingIntent = PendingIntent.getBroadcast(mApplicationContext, mId, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT);
         if (isExact) {
@@ -352,6 +356,13 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements
         mView.setAttribute(mId, repeatInterval, checkedHardware);
         
         mIsRepeat = true;
+    }
+
+    public void setRepeatAlarm(long scheduleTime, long repeatInterval,
+            ArrayList<Hardware> checkedHardware, boolean isExact) {
+        // 200000 : SENSOR_DELAY_NORMAL
+        setRepeatAlarm(scheduleTime, repeatInterval, checkedHardware, isExact, mSensorTimeout,
+                200000);
 	}
 
     public void cancelRepeatAlarm() {
@@ -362,18 +373,21 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements
 				.getSystemService(Context.ALARM_SERVICE);
         alarmManager.cancel(mPendingIntent);
 	}
-
+    
     public void setOnetimeAlarm(long scheduleTime, ArrayList<Hardware> checkedHardware,
-            boolean isExact) {
-		if(DEBUG){
+            boolean isExact, long accAccessTime, int accRate) {
+        if (DEBUG) {
             Log.d(TAG, "setOnetimeAlarm(). Hardware: " + checkedHardware.toString());
-		}
+        }
         AlarmManager am = (AlarmManager) mApplicationContext
                 .getSystemService(Context.ALARM_SERVICE);
         Intent intent = new Intent(mApplicationContext, AlarmManagerBroadcastReceiver.class);
         intent.setAction(Integer.toString(mId));
         intent.putExtra(CHECK_HARDWARE, checkedHardware);
         intent.putExtra(ONE_TIME, Boolean.TRUE);
+        intent.putExtra(IS_EXACT, isExact);
+        intent.putExtra(ACC_ACCESS_TIME, accAccessTime);
+        intent.putExtra(ACC_RATE, accRate);
         mPendingIntent = PendingIntent.getBroadcast(mApplicationContext, mId, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT);
         if (isExact) {
@@ -385,6 +399,12 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements
         mView = new AlarmView(mActivityContext, this);
         mView.setAttribute(mId, -1, checkedHardware);
         mIsRepeat = false;
+    }
+
+    public void setOnetimeAlarm(long scheduleTime, ArrayList<Hardware> checkedHardware,
+            boolean isExact) {
+        // 200000 : SENSOR_DELAY_NORMAL
+        setOnetimeAlarm(scheduleTime, checkedHardware, isExact, mSensorTimeout, 200000);
 	}
 
     @Override
@@ -400,11 +420,13 @@ public class AlarmManagerBroadcastReceiver extends BroadcastReceiver implements
         if (mySensor.getType() == Sensor.TYPE_ACCELEROMETER) {
             if (mSensorStartRTC == -1) {
                 if (DEBUG) {
-                    Log.d(TAG, "onSensorChanged(). x:" + event.values[0] + " y:" + event.values[1]
-                            + " z:" + event.values[2]);
+                    Log.d(TAG, "onSensorChanged() start. x:" + event.values[0] + " y:"
+                            + event.values[1] + " z:" + event.values[2]);
                 }
                 mSensorStartRTC = System.currentTimeMillis();
             } else if (System.currentTimeMillis() - mSensorStartRTC > mSensorTimeout) {
+                Log.d(TAG, "onSensorChanged() finish. x:" + event.values[0] + " y:"
+                        + event.values[1] + " z:" + event.values[2]);
                 mSensorManager.unregisterListener(this);
                 mHandler.sendEmptyMessageDelayed(RELEASE_WAKELOCK, 0);
             }
